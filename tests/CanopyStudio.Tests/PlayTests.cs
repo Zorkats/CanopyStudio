@@ -27,7 +27,7 @@ public sealed class PlayTests : IDisposable
 
     private string Put(string path, string text)
     {
-        string full = Path.Combine(game, path);
+        string full = Path.Combine(game, NativePath.Of(path));
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         File.WriteAllText(full, text, new UTF8Encoding(false));
         return full;

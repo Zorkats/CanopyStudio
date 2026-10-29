@@ -249,7 +249,7 @@ public sealed class CreateTests : IDisposable
     {
         string folder = Path.Combine(root, "Art");
         Assert.Equal("art/lantern.png", ProjectPaths.Relative(folder, Path.Combine(folder, "art", "lantern.png")));
-        Assert.Equal("main.lua", ProjectPaths.Relative(folder + "\\", Path.Combine(folder, "main.lua")));
+        Assert.Equal("main.lua", ProjectPaths.Relative(folder + Path.DirectorySeparatorChar,Path.Combine(folder, "main.lua")));
         Assert.Null(ProjectPaths.Relative(folder, Path.Combine(root, "elsewhere.png")));
         Assert.Null(ProjectPaths.Relative(folder, Path.Combine(root, "Art2", "x.png")));
         Assert.Null(ProjectPaths.Relative(folder, folder));
@@ -273,7 +273,9 @@ public sealed class CreateTests : IDisposable
         Assert.Equal(Folder(9), list[0]);
         Assert.DoesNotContain(Folder(1), list);
 
-        list = RecentProjects.Add(list, Folder(5).ToUpperInvariant() + "\\");
+        // Windows paths ignore case; Linux ones do not.
+        string again = OperatingSystem.IsWindows() ? Folder(5).ToUpperInvariant() : Folder(5);
+        list = RecentProjects.Add(list, again + Path.DirectorySeparatorChar);
         Assert.Equal(RecentProjects.Limit, list.Count);
         Assert.True(RecentProjects.Same(Folder(5), list[0]));
         Assert.Single(list, folder => RecentProjects.Same(folder, Folder(5)));

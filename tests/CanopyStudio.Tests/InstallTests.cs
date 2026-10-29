@@ -209,7 +209,7 @@ public sealed class InstallTests : IDisposable
     public void PackageHoldsItsOneFile()
     {
         Assert.Contains("lacks dinput8.dll", CanopyPackage.Read(QoLZip(), PackageKind.Canopy, "1").Error);
-        Assert.Contains("lacks mods\\VillageQoL.dll", CanopyPackage.Read(CanopyZip(), PackageKind.VillageQoL, "1").Error);
+        Assert.Contains("lacks " + Path.Combine("mods", "VillageQoL.dll"),CanopyPackage.Read(CanopyZip(), PackageKind.VillageQoL, "1").Error);
         Assert.Contains("is not Canopy", CanopyPackage.Read(CanopyZip(OtherDll), PackageKind.Canopy, "1").Error);
         Assert.Contains("not a zip", CanopyPackage.Read([1, 2, 3], PackageKind.Canopy, "1").Error);
 
@@ -294,8 +294,17 @@ public sealed class InstallTests : IDisposable
         string path = Path.Combine(game, CanopyPackage.PathOf(kind));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, old);
-        // A read-only file makes the write fail.
+        // A read-only file makes the write fail, except for root on Linux,
+        // as in a CI container.
         File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            new FileStream(path, FileMode.Open, FileAccess.Write).Dispose();
+            return;
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
 
         InstallResult result = CanopyInstaller.Install(game, Package(kind), gameRunning: false, Now);
 

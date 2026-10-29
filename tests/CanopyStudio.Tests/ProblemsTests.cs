@@ -108,7 +108,7 @@ public sealed class ProblemsTests(ITestOutputHelper output) : IDisposable
 
     private string Write(string relative, string text)
     {
-        string path = Path.Combine(root, relative);
+        string path = Path.Combine(root, NativePath.Of(relative));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text);
         return path;

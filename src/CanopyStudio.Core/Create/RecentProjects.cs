@@ -17,10 +17,11 @@ public static class RecentProjects
     public static IReadOnlyList<string> Remove(IReadOnlyList<string>? list, string folder) =>
         (list ?? []).Where(other => !Same(other, folder)).ToList();
 
-    // Paths name one folder on Windows without case and without a final
-    // separator.
+    // Paths name one folder without a final separator, and on Windows
+    // without case. Linux folders differing only in case are two folders.
     public static bool Same(string left, string right) =>
-        string.Equals(Normal(left), Normal(right), StringComparison.OrdinalIgnoreCase);
+        string.Equals(Normal(left), Normal(right),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private static string Normal(string folder) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
 }

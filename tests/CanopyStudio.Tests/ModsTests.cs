@@ -43,7 +43,7 @@ public sealed class ModsTests : IDisposable
 
     private string Put(string path, byte[] bytes)
     {
-        string full = Path.Combine(game, path);
+        string full = Path.Combine(game, NativePath.Of(path));
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         File.WriteAllBytes(full, bytes);
         return full;
@@ -90,10 +90,6 @@ public sealed class ModsTests : IDisposable
     private ModInstallPlan Plan(string zipName, params (string Name, string Text)[] entries) =>
         ModZip.Plan(game, Zip(entries), zipName);
 
-    // ---------------------------------------------------------------
-    // S1 scan
-    // ---------------------------------------------------------------
-
     [Fact]
     public void ScanFindsEachModShape()
     {
@@ -106,7 +102,8 @@ public sealed class ModsTests : IDisposable
         Put(@"mods\ItemMod\canopy.ini", "[mod]\nname = Items\n[item.Pebble]\nbase = 230070\n");
         Put(@"mods\FileMod\data\Database\String.dat", "x");
         Put(@"mods\FileMod\data\texture\a.tex", "y");
-        File.SetAttributes(Put(@"mods\FileMod\data\Thumbs.db", "z"), FileAttributes.Hidden);
+        // Linux has no hidden attribute; a leading dot hides the file there.
+        File.SetAttributes(Put(@"mods\FileMod\data\.Thumbs.db", "z"), FileAttributes.Hidden);
         Put("mods\\FileMod\\data\\caf\u00e9.dat", "w");
         Put(@"mods\SettingsMod\canopy.ini", "[mod]\n[setting.A]\n");
         Put(@"mods\DllFolder\Thing.dll", "MZ");
@@ -140,7 +137,8 @@ public sealed class ModsTests : IDisposable
         Assert.Equal(ModKind.Files, files.Kind);
         Assert.True(files.Disabled);
         Assert.Equal(
-            [new ModOverride("data/database/string.dat", @"data\Database\String.dat"), new ModOverride("data/texture/a.tex", @"data\texture\a.tex")],
+            [new ModOverride("data/database/string.dat", NativePath.Of(@"data\Database\String.dat")),
+             new ModOverride("data/texture/a.tex", NativePath.Of(@"data\texture\a.tex"))],
             files.Overrides);
     }
 
@@ -180,10 +178,6 @@ public sealed class ModsTests : IDisposable
         public ModIniInfo? Read(string path) => new("K", "N", "9", ["mod", "villager.X"]);
     }
 
-    // ---------------------------------------------------------------
-    // S2 conflicts
-    // ---------------------------------------------------------------
-
     [Fact]
     public void ConflictsNameTheWinnerTheWayTheLoaderPicksIt()
     {
@@ -205,10 +199,6 @@ public sealed class ModsTests : IDisposable
         Assert.Equal(["aaa", "Mod_B", "ModA"], conflict.Mods);
         Assert.Equal("ModA", conflict.Winner);
     }
-
-    // ---------------------------------------------------------------
-    // S3 disabled.txt
-    // ---------------------------------------------------------------
 
     [Fact]
     public void TurningOffAndOnKeepsCommentsAndOtherEntries()
@@ -264,10 +254,6 @@ public sealed class ModsTests : IDisposable
         Assert.False(File.Exists(DisabledMods.PathIn(game)));
     }
 
-    // ---------------------------------------------------------------
-    // S4 install plans
-    // ---------------------------------------------------------------
-
     [Fact]
     public void AZipHoldingModsGoesWhereItSays()
     {
@@ -279,15 +265,15 @@ public sealed class ModsTests : IDisposable
 
         Assert.True(plan.Ok, string.Join(" ", plan.Problems));
         Assert.Equal(("Foo", false), (plan.Mod, plan.IsDllFile));
-        Assert.Equal([@"mods\Foo\canopy.ini", @"mods\Foo\lua\main.lua"], plan.Writes.Select(file => file.Path));
-        Assert.Equal([@"mods\Foo\canopy.ini"], plan.Replaces);
-        Assert.Equal([@"mods\Foo\old.lua"], plan.Removes);
+        Assert.Equal([NativePath.Of(@"mods\Foo\canopy.ini"), NativePath.Of(@"mods\Foo\lua\main.lua")], plan.Writes.Select(file => file.Path));
+        Assert.Equal([NativePath.Of(@"mods\Foo\canopy.ini")], plan.Replaces);
+        Assert.Equal([NativePath.Of(@"mods\Foo\old.lua")], plan.Removes);
         Assert.Equal(["README.md"], plan.Skipped);
 
         ModInstallPlan dll = Plan("Bar-1.0.zip", ("mods/Bar.dll", "MZ"), ("LICENSE", "licence"));
         Assert.True(dll.Ok);
         Assert.Equal(("Bar.dll", true), (dll.Mod, dll.IsDllFile));
-        Assert.Equal([@"mods\Bar.dll"], dll.Writes.Select(file => file.Path));
+        Assert.Equal([NativePath.Of(@"mods\Bar.dll")], dll.Writes.Select(file => file.Path));
     }
 
     [Fact]
@@ -298,12 +284,12 @@ public sealed class ModsTests : IDisposable
         ModInstallPlan dll = Plan("x.zip", ("Wrap/Wrap.dll", "MZ"), ("Wrap/readme.txt", "r"));
 
         Assert.Equal("Pack", ini.Mod);
-        Assert.Equal([@"mods\Pack\canopy.ini", @"mods\Pack\data\x.dat"], ini.Writes.Select(file => file.Path));
+        Assert.Equal([NativePath.Of(@"mods\Pack\canopy.ini"), NativePath.Of(@"mods\Pack\data\x.dat")], ini.Writes.Select(file => file.Path));
         Assert.Equal("Textures", data.Mod);
         // Canopy loads only DLL files directly in mods, so the DLL leaves its folder.
         Assert.Equal(("Wrap.dll", true), (dll.Mod, dll.IsDllFile));
-        Assert.Equal([@"mods\Wrap.dll"], dll.Writes.Select(file => file.Path));
-        Assert.Equal([@"Wrap\readme.txt"], dll.Skipped);
+        Assert.Equal([NativePath.Of(@"mods\Wrap.dll")], dll.Writes.Select(file => file.Path));
+        Assert.Equal([NativePath.Of(@"Wrap\readme.txt")], dll.Skipped);
         Assert.False(Plan("x.zip", ("Two/A.dll", "MZ"), ("Two/B.dll", "MZ")).Ok);
     }
 
@@ -314,7 +300,7 @@ public sealed class ModsTests : IDisposable
 
         Assert.True(plan.Ok);
         Assert.Equal("Cool Mod", plan.Mod);
-        Assert.Equal([@"mods\Cool Mod\canopy.ini", @"mods\Cool Mod\lua\main.lua"], plan.Writes.Select(file => file.Path));
+        Assert.Equal([NativePath.Of(@"mods\Cool Mod\canopy.ini"), NativePath.Of(@"mods\Cool Mod\lua\main.lua")], plan.Writes.Select(file => file.Path));
         Assert.Empty(plan.Replaces);
     }
 
@@ -322,14 +308,14 @@ public sealed class ModsTests : IDisposable
     public void ASingleDllInstallsDirectlyInMods()
     {
         ModInstallPlan zipped = Plan("whatever.zip", ("Thing.dll", "MZ"), ("readme.txt", "r"));
-        ModInstallPlan lone = ModZip.Plan(game, "MZ lone"u8.ToArray(), @"C:\Downloads\Lone.dll");
+        ModInstallPlan lone = ModZip.Plan(game, "MZ lone"u8.ToArray(), NativePath.Of(@"C:\Downloads\Lone.dll"));
 
         Assert.Equal(("Thing.dll", true), (zipped.Mod, zipped.IsDllFile));
         Assert.Equal(["readme.txt"], zipped.Skipped);
         Assert.True(lone.Ok);
         Assert.Equal(("Lone.dll", true), (lone.Mod, lone.IsDllFile));
         Assert.Equal("MZ lone"u8.ToArray(), Assert.Single(lone.Writes).Bytes);
-        Assert.Equal(@"mods\Lone.dll", lone.Writes[0].Path);
+        Assert.Equal(NativePath.Of(@"mods\Lone.dll"), lone.Writes[0].Path);
     }
 
     [Theory]
@@ -389,10 +375,6 @@ public sealed class ModsTests : IDisposable
         }
     }
 
-    // ---------------------------------------------------------------
-    // S5 apply, remove, undo
-    // ---------------------------------------------------------------
-
     [Fact]
     public void ApplyThenUndoRestoresTheFolderByteForByte()
     {
@@ -407,9 +389,9 @@ public sealed class ModsTests : IDisposable
         ModResult applied = ModChanges.Apply(game, plan, backups, gameRunning: false, Now);
 
         Assert.True(applied.Ok, applied.Message);
-        Assert.Equal("new ini", File.ReadAllText(Path.Combine(game, @"mods\Foo\canopy.ini")));
-        Assert.False(File.Exists(Path.Combine(game, @"mods\Foo\old.lua")));
-        Assert.False(Directory.Exists(Path.Combine(game, @"mods\Foo\empty")));
+        Assert.Equal("new ini", File.ReadAllText(Path.Combine(game, NativePath.Of(@"mods\Foo\canopy.ini"))));
+        Assert.False(File.Exists(Path.Combine(game, NativePath.Of(@"mods\Foo\old.lua"))));
+        Assert.False(Directory.Exists(Path.Combine(game, NativePath.Of(@"mods\Foo\empty"))));
         Assert.Equal(ModChangeKind.Install, ModChanges.Last(game, backups)!.Kind);
 
         ModResult undone = ModChanges.Undo(game, backups, gameRunning: false);
@@ -427,7 +409,7 @@ public sealed class ModsTests : IDisposable
         SortedDictionary<string, string> before = Tree(game);
 
         Assert.True(ModChanges.Apply(game, Plan("New.zip", ("canopy.ini", "[mod]")), backups, false, Now).Ok);
-        Assert.True(File.Exists(Path.Combine(game, @"mods\New\canopy.ini")));
+        Assert.True(File.Exists(Path.Combine(game, NativePath.Of(@"mods\New\canopy.ini"))));
         Assert.True(ModChanges.Undo(game, backups, false).Ok);
 
         Assert.Equal(before, Tree(game));
@@ -449,8 +431,8 @@ public sealed class ModsTests : IDisposable
 
         // Undo takes back the last change first.
         Assert.True(ModChanges.Undo(game, backups, false).Ok);
-        Assert.True(File.Exists(Path.Combine(game, @"mods\Solo.dll")));
-        Assert.False(Directory.Exists(Path.Combine(game, @"mods\Foo")));
+        Assert.True(File.Exists(Path.Combine(game, NativePath.Of(@"mods\Solo.dll"))));
+        Assert.False(Directory.Exists(Path.Combine(game, NativePath.Of(@"mods\Foo"))));
         Assert.True(ModChanges.Undo(game, backups, false).Ok);
         Assert.Equal(before, Tree(game));
     }
@@ -471,10 +453,10 @@ public sealed class ModsTests : IDisposable
         Assert.NotNull(ModChanges.Last(game, backups));
 
         // An edited file counts too.
-        File.Delete(Path.Combine(game, @"mods\Foo\notes.txt"));
+        File.Delete(Path.Combine(game, NativePath.Of(@"mods\Foo\notes.txt")));
         Put(@"mods\Foo\canopy.ini", "edited");
         Assert.False(ModChanges.Undo(game, backups, false).Ok);
-        Assert.Equal("edited", File.ReadAllText(Path.Combine(game, @"mods\Foo\canopy.ini")));
+        Assert.Equal("edited", File.ReadAllText(Path.Combine(game, NativePath.Of(@"mods\Foo\canopy.ini"))));
     }
 
     [Fact]
@@ -488,13 +470,19 @@ public sealed class ModsTests : IDisposable
 
         Assert.False(result.Ok);
         Assert.Contains("Plan the install again", result.Message);
-        Assert.Equal("old", File.ReadAllText(Path.Combine(game, @"mods\Foo\canopy.ini")));
+        Assert.Equal("old", File.ReadAllText(Path.Combine(game, NativePath.Of(@"mods\Foo\canopy.ini"))));
         Assert.False(Directory.Exists(backups));
     }
 
     [Fact]
     public void AFailureHalfwayPutsTheModBack()
     {
+        // The failure below comes from a Windows share lock. Linux locks are
+        // advisory, so nothing fails there.
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
         Put(@"mods\Foo\a.txt", "old a");
         Put(@"mods\Foo\b.txt", "old b");
         string last = Put(@"mods\Foo\z.txt", "old z");
@@ -552,7 +540,7 @@ public sealed class ModsTests : IDisposable
         Assert.Contains("is not a mod", ModChanges.Remove(game, @"..\..", backups, false, Now).Message);
         File.Delete(Path.Combine(game, "village.exe"));
         Assert.Contains("village.exe is not in this folder", ModChanges.Remove(game, "Foo", backups, false, Now).Message);
-        Assert.True(File.Exists(Path.Combine(game, @"mods\Foo\canopy.ini")));
+        Assert.True(File.Exists(Path.Combine(game, NativePath.Of(@"mods\Foo\canopy.ini"))));
         Assert.False(Directory.Exists(backups));
     }
 
@@ -565,7 +553,7 @@ public sealed class ModsTests : IDisposable
 
         Assert.Contains("cannot be read", ModChanges.Remove(game, "Foo", backups, false, Now).Message);
         Assert.Contains("cannot be read", ModChanges.Undo(game, backups, false).Message);
-        Assert.True(File.Exists(Path.Combine(game, @"mods\Foo\canopy.ini")));
+        Assert.True(File.Exists(Path.Combine(game, NativePath.Of(@"mods\Foo\canopy.ini"))));
     }
 
     [Fact]
@@ -576,15 +564,23 @@ public sealed class ModsTests : IDisposable
         File.WriteAllText(Path.Combine(project, "canopy.ini"), "[mod]");
         Directory.CreateDirectory(Path.Combine(game, "mods"));
         string link = Path.Combine(game, "mods", "Linked");
-        // A junction, as a playtest makes; it needs no rights.
-        using (Process? mklink = Process.Start(new ProcessStartInfo("cmd.exe", ["/c", "mklink", "/J", link, project])
+        // A junction, as a playtest makes on Windows, where it needs no
+        // rights. Elsewhere a symbolic link.
+        if (OperatingSystem.IsWindows())
         {
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-        }))
+            using (Process? mklink = Process.Start(new ProcessStartInfo("cmd.exe", ["/c", "mklink", "/J", link, project])
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+            }))
+            {
+                mklink?.WaitForExit();
+            }
+        }
+        else
         {
-            mklink?.WaitForExit();
+            Directory.CreateSymbolicLink(link, project);
         }
         if (!File.Exists(Path.Combine(link, "canopy.ini")))
         {
