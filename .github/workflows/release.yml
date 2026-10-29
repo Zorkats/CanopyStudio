@@ -102,13 +102,23 @@ jobs:
           archive_existing_version: true
           update_mod_version: true
 
+      # Nexus takes no .tar.gz, so the Linux package goes up as a zip. Zip keeps the execute bits.
+      - name: Repack the Linux package as a zip
+        if: vars.NEXUS_FILE_ID_LINUX != ''
+        env:
+          NAME: CanopyStudio-${{ steps.tag.outputs.version }}-linux-x64
+        run: |
+          mkdir linux
+          tar -xzf "dist/$NAME.tar.gz" -C linux
+          (cd linux && zip -qr "../dist/$NAME.zip" .)
+
       - name: Upload the Linux package
         if: vars.NEXUS_FILE_ID_LINUX != ''
         uses: Nexus-Mods/upload-action@98532f7670c27cbecc78fae03fa3e278147827e2 # v1.0.0-beta.11
         with:
           api_key: ${{ secrets.NEXUSMODS_API_KEY }}
           file_id: ${{ vars.NEXUS_FILE_ID_LINUX }}
-          filename: dist/CanopyStudio-${{ steps.tag.outputs.version }}-linux-x64.tar.gz
+          filename: dist/CanopyStudio-${{ steps.tag.outputs.version }}-linux-x64.zip
           display_name: Canopy Studio for Linux
           version: ${{ steps.tag.outputs.version }}
           category: main
