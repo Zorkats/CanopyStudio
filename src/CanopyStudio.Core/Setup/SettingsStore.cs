@@ -32,9 +32,8 @@ public sealed record StudioSettings
 }
 
 // settings.json in %APPDATA%\CanopyStudio, ~/.config/CanopyStudio on Linux.
-// A missing or damaged file reads
-// as the defaults; a write goes to a temporary file first, so a crash never
-// leaves half a file.
+// A missing or damaged file reads as the defaults; a write goes to a
+// temporary file first, so a crash never leaves half a file.
 public sealed class SettingsStore(string folder)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };

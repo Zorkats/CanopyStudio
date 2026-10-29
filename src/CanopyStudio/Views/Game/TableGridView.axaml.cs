@@ -25,7 +25,7 @@ public sealed partial class TableGridView : UserControl
         "M3,7 H13 V15 H3 Z M4.5,7 V5 A3.5,3.5 0 0 1 11.5,5 V7 H10 V5 A2,2 0 0 0 6,5 V7 Z");
 
     // The fields that pick which builds a row is for, read only in every
-    // table (gen_table_schemas.py BUILD_FIELDS).
+    // table.
     private static readonly HashSet<string> BuildFields =
         new(["version", "disableVersion", "region", "product", "platform"], StringComparer.OrdinalIgnoreCase);
 
