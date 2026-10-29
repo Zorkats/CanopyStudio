@@ -58,4 +58,4 @@ GitHub Actions builds and tests every push and pull request on Windows and Linux
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The packages also carry the .NET runtime and the libraries Canopy Studio uses; their licenses are in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
