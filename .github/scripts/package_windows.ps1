@@ -40,6 +40,7 @@ $stage = Join-Path $stageRoot "CanopyStudio"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 Copy-Item -Recurse -Force (Join-Path $StudioDir "*") $stage
 Copy-Item -Force (Join-Path $repoRoot "LICENSE") $stage
+Copy-Item -Force (Join-Path $repoRoot "THIRD_PARTY_NOTICES.txt") $stage
 $zip = Join-Path $OutDir "CanopyStudio-$Version-windows-x64.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path $stage -DestinationPath $zip

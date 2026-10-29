@@ -39,7 +39,7 @@ rm -rf "$stage_root"
 studio="$stage_root/CanopyStudio"
 mkdir -p "$studio"
 cp -r "$studio_dir/." "$studio/"
-install -m 644 "$repo_root/LICENSE" "$studio/"
+install -m 644 "$repo_root/LICENSE" "$repo_root/THIRD_PARTY_NOTICES.txt" "$studio/"
 chmod +x "$studio/CanopyStudio"
 
 # Fixed ownership, order and times so the same tree always produces the same tarball.
