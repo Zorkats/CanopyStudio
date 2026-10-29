@@ -68,3 +68,48 @@ jobs:
 
           gh release create "$TAG" "${assets[@]}" --verify-tag --title "Canopy Studio $version" \
             --notes-file notes.md --generate-notes
+
+  # Adds the release to the Nexus Mods page as a new version of each file there. Nexus adds
+  # versions only to a file that already exists, so each upload waits for its file's ID in the
+  # repository variables, set once that file has been uploaded by hand. A failure here leaves the
+  # GitHub release as it is.
+  nexus:
+    needs: [publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+
+      - name: Read the version
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the Windows package
+        if: vars.NEXUS_FILE_ID_WINDOWS != ''
+        uses: Nexus-Mods/upload-action@98532f7670c27cbecc78fae03fa3e278147827e2 # v1.0.0-beta.11
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          file_id: ${{ vars.NEXUS_FILE_ID_WINDOWS }}
+          filename: dist/CanopyStudio-${{ steps.tag.outputs.version }}-windows-x64.zip
+          display_name: Canopy Studio for Windows
+          version: ${{ steps.tag.outputs.version }}
+          category: main
+          archive_existing_version: true
+          update_mod_version: true
+
+      - name: Upload the Linux package
+        if: vars.NEXUS_FILE_ID_LINUX != ''
+        uses: Nexus-Mods/upload-action@98532f7670c27cbecc78fae03fa3e278147827e2 # v1.0.0-beta.11
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          file_id: ${{ vars.NEXUS_FILE_ID_LINUX }}
+          filename: dist/CanopyStudio-${{ steps.tag.outputs.version }}-linux-x64.tar.gz
+          display_name: Canopy Studio for Linux
+          version: ${{ steps.tag.outputs.version }}
+          category: main
+          archive_existing_version: true
