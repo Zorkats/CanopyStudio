@@ -1,0 +1,99 @@
+name: Build (Windows)
+
+# Builds canopy_core.dll from the Canopy submodule, tests Canopy Studio, publishes it
+# self-contained for Windows, and packages it with .github/scripts/package_windows.ps1, which
+# refuses a canopy_core.dll that needs the Visual C++ redistributable. The zip is a workflow
+# artifact; build.yml and release.yml call this same workflow, so a pull request and a tagged
+# release pass the same checks.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version for the package name, without the leading v; empty for the tag or dev-<commit>'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the package name, without the leading v'
+        required: true
+        default: '0.0.0-test'
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  windows:
+    # Pinned rather than windows-latest, which moves between images: the toolchain that builds a
+    # release should change when we decide it does, not when the runner pool rolls over.
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Canopy, in external/Canopy: canopy_core's sources, and the Lua docs the tests read.
+          submodules: recursive
+
+      - name: Resolve version
+        id: version
+        # Through the environment rather than inline, so the input cannot be read as shell syntax.
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $value = $env:REQUESTED_VERSION
+          if (-not $value -and $env:GITHUB_REF_TYPE -eq 'tag') { $value = $env:GITHUB_REF_NAME -replace '^v', '' }
+          if (-not $value) { $value = "dev-$($env:GITHUB_SHA.Substring(0, 7))" }
+          # .NET wants three numbers for the assembly version; dev builds read as 0.0.0.
+          $numbers = if ($value -match '^(\d+\.\d+\.\d+)') { $Matches[1] } else { '0.0.0' }
+          "value=$value" >> $env:GITHUB_OUTPUT
+          "numbers=$numbers" >> $env:GITHUB_OUTPUT
+
+      - name: Set up the MSVC x64 environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build canopy_core
+        # Into build/canopy, where CanopyStudio.Core.csproj looks for it. No vcpkg: only the
+        # loader needs MinHook, and it is not built here.
+        run: |
+          cmake -S external/Canopy -B build/canopy -G Ninja -DCMAKE_BUILD_TYPE=Release -DCANOPY_BUILD_LOADER=OFF -DCANOPY_BUILD_TESTS=OFF -DCANOPY_BUILD_EXAMPLES=OFF
+          cmake --build build/canopy --target canopy_core
+
+      - name: Test
+        run: dotnet test tests/CanopyStudio.Tests -c Release
+
+      - name: Publish
+        # Self-contained, so a player needs no .NET install. CanopyStudio.Core.csproj copies
+        # canopy_core.dll in.
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          NUMBERS: ${{ steps.version.outputs.numbers }}
+        shell: pwsh
+        run: >
+          dotnet publish src/CanopyStudio/CanopyStudio.csproj -c Release -r win-x64
+          --self-contained -o build/studio-win
+          "-p:Version=$env:NUMBERS" "-p:InformationalVersion=$env:VERSION"
+
+      - name: Package and verify dependencies
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: pwsh .github/scripts/package_windows.ps1 -StudioDir build/studio-win -Version $env:VERSION -OutDir dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows-${{ steps.version.outputs.value }}
+          path: dist/*.zip
+          if-no-files-found: error

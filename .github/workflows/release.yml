@@ -1,0 +1,70 @@
+name: Release
+
+# A tag such as v1.2.0 publishes a GitHub release with Canopy Studio for Windows and Linux. The
+# builds are the platform workflows themselves, called rather than copied, and nothing is
+# published unless both built.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Queued, not cancelled: a cancelled publish could leave the release half made.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    uses: ./.github/workflows/release-windows.yml
+
+  linux:
+    uses: ./.github/workflows/release-linux.yml
+
+  publish:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    # The only job that can write.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          version="${TAG#v}"
+          assets=("dist/CanopyStudio-$version-windows-x64.zip" "dist/CanopyStudio-$version-linux-x64.tar.gz")
+          for asset in "${assets[@]}"; do
+            if [ ! -f "$asset" ]; then
+              echo "::error::$(basename "$asset") is missing."
+              exit 1
+            fi
+          done
+
+          {
+            echo "## Downloads"
+            echo
+            echo "| System | Download | Then |"
+            echo "|---|---|---|"
+            echo "| Windows 10 or 11, 64-bit | \`CanopyStudio-$version-windows-x64.zip\` | Extract anywhere, run \`CanopyStudio.exe\`. |"
+            echo "| Linux, 64-bit (x86-64) | \`CanopyStudio-$version-linux-x64.tar.gz\` | Extract anywhere, run \`CanopyStudio\`. |"
+            echo
+            echo "Both carry everything they need: no .NET or other runtime to install. Canopy Studio installs [Canopy](https://github.com/Zorkats/Canopy/releases/latest) and [VillageQoL](https://github.com/Zorkats/VillageQoL/releases/latest) from their latest releases, each download checked against the SHA-256 GitHub lists for it."
+          } > notes.md
+
+          gh release create "$TAG" "${assets[@]}" --verify-tag --title "Canopy Studio $version" \
+            --notes-file notes.md --generate-notes

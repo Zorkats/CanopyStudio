@@ -1,0 +1,25 @@
+# Builds and tests every push to main and every pull request on Windows and Linux, with the
+# same workflows a release uses, so a change that would break a release fails here first. The
+# packages are kept as workflow artifacts named after the commit. Tagged releases come from
+# release.yml.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push to the same branch or pull request makes an older run pointless.
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    uses: ./.github/workflows/release-windows.yml
+
+  linux:
+    uses: ./.github/workflows/release-linux.yml
